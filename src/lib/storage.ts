@@ -4,8 +4,8 @@ import type { Project } from "./types";
 import { defaultStyle } from "./templates";
 import { SIZES } from "./sizes";
 
-const PROJECT_KEY = "storeshot:project:v1";
-const LICENSE_KEY = "storeshot:license";
+const PROJECT_KEY = "shotlingo:project:v1";
+const LICENSE_KEY = "shotlingo:license";
 
 export const newProject = (): Project => ({
   version: 1,
@@ -35,13 +35,13 @@ export async function saveProject(p: Project) {
 
 export async function saveImage(key: string, dataUrl: string) {
   try {
-    await set(`storeshot:img:${key}`, dataUrl);
+    await set(`shotlingo:img:${key}`, dataUrl);
   } catch {}
 }
 
 export async function loadImage(key: string): Promise<string | undefined> {
   try {
-    return (await get(`storeshot:img:${key}`)) as string | undefined;
+    return (await get(`shotlingo:img:${key}`)) as string | undefined;
   } catch {
     return undefined;
   }
@@ -49,7 +49,7 @@ export async function loadImage(key: string): Promise<string | undefined> {
 
 export async function deleteImage(key: string) {
   try {
-    await del(`storeshot:img:${key}`);
+    await del(`shotlingo:img:${key}`);
   } catch {}
 }
 

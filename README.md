@@ -1,4 +1,4 @@
-# Storeshot
+# ShotLingo
 
 App Store & Google Play screenshot generator: upload raw screenshots → AI captions → templates & device frames → every store size in up to 40 languages → one ZIP.
 

@@ -1,6 +1,6 @@
 // Central product config. Rename the product here.
 export const SITE = {
-  name: "Storeshot",
+  name: "ShotLingo",
   tagline: "App Store & Play Store screenshots in every size and 40 languages.",
   url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@example.com",
