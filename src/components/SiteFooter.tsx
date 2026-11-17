@@ -7,6 +7,8 @@ export default function SiteFooter() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-8 text-sm text-neutral-500">
         <span>© {new Date().getFullYear()} {SITE.name}</span>
         <Link href="/app-store-screenshot-sizes" className="hover:text-neutral-900">Screenshot size guide</Link>
+        <Link href="/google-play-feature-graphic" className="hover:text-neutral-900">Feature graphic guide</Link>
+        <Link href="/localize-app-store-screenshots" className="hover:text-neutral-900">Localization guide</Link>
         <Link href="/privacy" className="hover:text-neutral-900">Privacy</Link>
         <Link href="/terms" className="hover:text-neutral-900">Terms</Link>
         <a href={`mailto:${SITE.supportEmail}`} className="hover:text-neutral-900">Contact</a>
