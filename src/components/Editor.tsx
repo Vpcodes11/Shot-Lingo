@@ -7,8 +7,11 @@ import { renderScreenshot } from "@/lib/render";
 import { SIZES, sizeById } from "@/lib/sizes";
 import { LANGUAGES, langByCode } from "@/lib/languages";
 import { TEMPLATES } from "@/lib/templates";
-import { CHECKOUT, PLANS, SITE } from "@/lib/site";
-import type { Caption, Layout, FrameStyle, Project, Screen, Style } from "@/lib/types";
+import { BILLING_PORTAL, CHECKOUT, PLANS, SITE } from "@/lib/site";
+import type { Caption, ExportLayout, Layout, FrameStyle, Listing, Project, Screen, Style } from "@/lib/types";
+import { LISTING_LIMITS } from "@/lib/types";
+import { DEMO_PROJECT, DEMO_SIZE, demoScreen } from "@/lib/demo";
+import type { Language } from "@/lib/languages";
 import {
   deleteImage, getLicense, loadImage, loadProject, newProject, saveImage, saveProject, setLicense,
 } from "@/lib/storage";
@@ -49,6 +52,26 @@ function captionFor(p: Project, s: Screen, lang: string): Caption {
   return p.translations[lang]?.[s.id] ?? s.caption;
 }
 
+const EMPTY_LISTING: Listing = { subtitle: "", promotionalText: "", keywords: "", description: "", playShortDescription: "" };
+
+function listingText(appName: string, lang: Language, l: Listing): string {
+  return [
+    `${appName} — ${lang.name}`,
+    "",
+    "== App Store ==",
+    `Subtitle (${l.subtitle.length}/30): ${l.subtitle}`,
+    `Promotional text (${l.promotionalText.length}/170): ${l.promotionalText}`,
+    `Keywords (${l.keywords.length}/100): ${l.keywords}`,
+    "",
+    "== Google Play ==",
+    `Short description (${l.playShortDescription.length}/80): ${l.playShortDescription}`,
+    "",
+    "== Description (both stores) ==",
+    l.description,
+    "",
+  ].join("\n");
+}
+
 async function api<T>(path: string, body: unknown, license: string): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
@@ -73,6 +96,7 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
   const [modal, setModal] = useState<null | "upgrade" | "languages" | "export">(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [view, setView] = useState<"screens" | "listing">("screens");
   const fileInput = useRef<HTMLInputElement>(null);
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
@@ -92,6 +116,7 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
       setImages(imgs);
       setProject(p);
       setLang(p.sourceLang);
+      if (new URLSearchParams(window.location.search).get("upgrade")) setModal("upgrade");
       const key = getLicense();
       setLicenseState(key);
       if (key) {
@@ -154,6 +179,23 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
     }
   }
 
+  async function loadExample() {
+    const accent = "#6d28d9";
+    const newScreens: Screen[] = [];
+    const newImgs: Record<string, HTMLImageElement> = {};
+    for (const d of DEMO_PROJECT.screens) {
+      const dataUrl = demoScreen(d.kind, accent);
+      const img = await loadImg(dataUrl);
+      const key = uid();
+      await saveImage(key, dataUrl);
+      newImgs[key] = img;
+      newScreens.push({ id: uid(), imageKey: key, width: DEMO_SIZE.width, height: DEMO_SIZE.height, caption: { ...d.caption } });
+    }
+    setImages((m) => ({ ...m, ...newImgs }));
+    update((p) => ({ ...p, appName: DEMO_PROJECT.appName, appDescription: DEMO_PROJECT.appDescription, screens: newScreens }));
+    notify("Example loaded. Try a template, then export.");
+  }
+
   function removeScreen(id: string) {
     const s = project?.screens.find((x) => x.id === id);
     if (s) deleteImage(s.imageKey);
@@ -183,6 +225,46 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
         translations: { ...p.translations, [lang]: { ...(p.translations[lang] || {}), [screenId]: { ...current, ...patch } } },
       };
     });
+  }
+
+  function editListing(patch: Partial<Listing>) {
+    update((p) => ({ ...p, listings: { ...p.listings, [lang]: { ...EMPTY_LISTING, ...(p.listings[lang] || {}), ...patch } } }));
+  }
+
+  async function aiListing() {
+    if (!project) return;
+    if (!pro) return setModal("upgrade");
+    if (!project.appDescription.trim() && !project.screens.some((s) => s.caption.headline.trim())) {
+      return notify("Describe your app (left panel) or write captions first.", "err");
+    }
+    const langs = project.languages;
+    setBusy("listing");
+    setProgress(0);
+    try {
+      const captions = project.screens.map((s) => s.caption);
+      let done = 0;
+      for (let i = 0; i < langs.length; i += 2) {
+        const batch = langs.slice(i, i + 2);
+        const r = await api<{ listings: { lang: string; listing: Listing }[] }>(
+          "/api/listing",
+          { appName: project.appName, appDescription: project.appDescription, captions, langs: batch },
+          license,
+        );
+        update((p) => {
+          const listings = { ...p.listings };
+          for (const l of r.listings) if (batch.includes(l.lang)) listings[l.lang] = l.listing;
+          return { ...p, listings };
+        });
+        done += batch.length;
+        setProgress(done / langs.length);
+      }
+      notify(`Listing written for ${langs.length} language${langs.length > 1 ? "s" : ""}.`);
+    } catch (e) {
+      notify((e as Error).message, "err");
+    } finally {
+      setBusy(null);
+      setProgress(null);
+    }
   }
 
   async function aiCaptions() {
@@ -257,20 +339,31 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
     const sizes = project.exportSizes.map(sizeById);
     if (!sizes.length) return notify("Pick at least one size.", "err");
     const langs = pro ? project.languages : [project.sourceLang];
+    const fastlane = project.exportLayout === "fastlane";
     setBusy("export");
     setProgress(0);
     try {
       await document.fonts.load(`800 40px ${fontFamily}`).catch(() => {});
       const zip = new JSZip();
-      const total = langs.length * sizes.length * project.screens.length;
+      const perLang = sizes.reduce((n, sz) => n + (sz.device === "feature-graphic" ? 1 : project.screens.length), 0);
+      const total = langs.length * perLang;
       let n = 0;
       const canvas = document.createElement("canvas");
+      const skipped = new Set<string>();
       for (const l of langs) {
+        const language = langByCode(l);
         for (const sz of sizes) {
+          const locale = sz.fastlane.platform === "ios" ? language.asc : language.play;
+          if (fastlane && !locale) {
+            skipped.add(`${language.name} (${sz.store})`);
+            n += sz.device === "feature-graphic" ? 1 : project.screens.length;
+            continue;
+          }
           canvas.width = sz.width;
           canvas.height = sz.height;
           const ctx = canvas.getContext("2d")!;
-          for (let i = 0; i < project.screens.length; i++) {
+          const count = sz.device === "feature-graphic" ? 1 : project.screens.length;
+          for (let i = 0; i < count; i++) {
             const s = project.screens[i];
             renderScreenshot(ctx, {
               width: sz.width,
@@ -281,14 +374,42 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
               caption: captionFor(project, s, l),
               style: project.style,
               device: sz.device,
-              lang: langByCode(l),
+              lang: language,
               fontFamily,
               watermark,
+              appName: project.appName,
             });
             const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-            if (blob) zip.file(`${l}/${sz.id}/${String(i + 1).padStart(2, "0")}_${sz.width}x${sz.height}.png`, blob);
+            const nn = String(i + 1).padStart(2, "0");
+            let path: string;
+            if (!fastlane) path = sz.device === "feature-graphic" ? `${l}/feature-graphic_1024x500.png` : `${l}/${sz.id}/${nn}_${sz.width}x${sz.height}.png`;
+            else if (sz.fastlane.platform === "ios") path = `fastlane/screenshots/${locale}/${nn}_${sz.id}.png`;
+            else if (sz.device === "feature-graphic") path = `fastlane/metadata/android/${locale}/images/featureGraphic.png`;
+            else path = `fastlane/metadata/android/${locale}/images/${sz.fastlane.folder}/${i + 1}.png`;
+            if (blob) zip.file(path, blob);
             n++;
             setProgress(n / total);
+          }
+        }
+        // Store listing text
+        const listing = project.listings[l];
+        if (listing) {
+          if (!fastlane) zip.file(`${l}/listing.txt`, listingText(project.appName, language, listing));
+          else {
+            if (language.asc) {
+              const base = `fastlane/metadata/${language.asc}`;
+              if (project.appName) zip.file(`${base}/name.txt`, project.appName);
+              zip.file(`${base}/subtitle.txt`, listing.subtitle);
+              zip.file(`${base}/promotional_text.txt`, listing.promotionalText);
+              zip.file(`${base}/keywords.txt`, listing.keywords);
+              zip.file(`${base}/description.txt`, listing.description);
+            }
+            if (language.play) {
+              const base = `fastlane/metadata/android/${language.play}`;
+              if (project.appName) zip.file(`${base}/title.txt`, project.appName.slice(0, 30));
+              zip.file(`${base}/short_description.txt`, listing.playShortDescription);
+              zip.file(`${base}/full_description.txt`, listing.description);
+            }
           }
         }
       }
@@ -296,12 +417,12 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
       const url = URL.createObjectURL(out);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${(project.appName || "app").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-screenshots.zip`;
+      a.download = `${(project.appName || "app").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-${fastlane ? "fastlane" : "screenshots"}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      notify(`Exported ${total} screenshots.`);
+      notify(skipped.size ? `Exported. Skipped (no store locale): ${[...skipped].join(", ")}` : `Exported ${total} images.`);
       setModal(null);
     } catch (e) {
       notify((e as Error).message || "Export failed.", "err");
@@ -339,7 +460,7 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
     setLang(p.sourceLang);
   }
 
-  const previewWidth = useMemo(() => (size.device.endsWith("tablet") ? 260 : 210), [size.device]);
+  const previewWidth = useMemo(() => (size.device === "feature-graphic" ? 560 : size.device.endsWith("tablet") ? 260 : 210), [size.device]);
 
   if (!project) {
     return <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">Loading editor…</div>;
@@ -426,6 +547,11 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
               }}
             />
           </section>
+          {project.screens.length === 0 && (
+            <button onClick={loadExample} className="w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50">
+              No screenshots handy? Try an example app
+            </button>
+          )}
 
           <button
             onClick={aiCaptions}
@@ -507,44 +633,80 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
           </section>
         </aside>
 
-        {/* Center: preview */}
+        {/* Center: preview / listing */}
         <main className="min-w-0 p-4 lg:h-[calc(100vh-61px)] lg:overflow-y-auto">
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <select value={sizeId} onChange={(e) => setSizeId(e.target.value)} className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm">
-              {SIZES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.store} · {s.label} ({s.width}×{s.height})
-                </option>
+            <div className="flex rounded-lg bg-neutral-200/70 p-1">
+              {([["screens", "Screenshots"], ["listing", "Store listing text"]] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === v ? "bg-white shadow-sm" : "text-neutral-600"}`}
+                >
+                  {label}
+                  {v === "listing" && !pro ? " 🔒" : ""}
+                </button>
               ))}
-            </select>
+            </div>
+            {view === "screens" && (
+              <select value={sizeId} onChange={(e) => setSizeId(e.target.value)} className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm">
+                {SIZES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.store} · {s.label} ({s.width}×{s.height})
+                  </option>
+                ))}
+              </select>
+            )}
             <select value={lang} onChange={(e) => setLang(e.target.value)} className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm">
               {project.languages.map((l) => (
                 <option key={l} value={l}>
                   {langByCode(l).name}
-                  {translated(l) ? "" : " (not translated yet)"}
+                  {view === "screens" && !translated(l) ? " (not translated yet)" : ""}
+                  {view === "listing" && !project.listings[l] ? " (not written yet)" : ""}
                 </option>
               ))}
             </select>
-            <span className="text-xs text-neutral-500">{size.note}</span>
+            {view === "screens" && <span className="text-xs text-neutral-500">{size.note}</span>}
           </div>
-          <div className="flex flex-wrap gap-4">
-            {(project.screens.length ? project.screens : [null]).map((s, i) => (
-              <PreviewCanvas
-                key={s?.id ?? "empty"}
-                size={size}
-                image={s ? images[s.imageKey] ?? null : null}
-                imageWidth={s?.width ?? 0}
-                imageHeight={s?.height ?? 0}
-                caption={s ? captionFor(project, s, lang) : { headline: "Your headline here", subheadline: "Upload a screenshot to begin" }}
-                style={project.style}
-                lang={language}
-                fontFamily={fontFamily}
-                watermark={watermark}
-                displayWidth={previewWidth}
-                fontsReady={fontsReady && i >= 0}
-              />
-            ))}
-          </div>
+
+          {view === "screens" ? (
+            <div className="flex flex-wrap gap-4">
+              {(project.screens.length ? (size.device === "feature-graphic" ? project.screens.slice(0, 1) : project.screens) : [null]).map((s) => (
+                <PreviewCanvas
+                  key={s?.id ?? "empty"}
+                  size={size}
+                  image={s ? images[s.imageKey] ?? null : null}
+                  imageWidth={s?.width ?? 0}
+                  imageHeight={s?.height ?? 0}
+                  caption={s ? captionFor(project, s, lang) : { headline: "Your headline here", subheadline: "Upload a screenshot to begin" }}
+                  style={project.style}
+                  lang={language}
+                  fontFamily={fontFamily}
+                  watermark={watermark}
+                  displayWidth={previewWidth}
+                  fontsReady={fontsReady}
+                  appName={project.appName}
+                />
+              ))}
+            </div>
+          ) : (
+            <ListingPanel
+              listing={project.listings[lang]}
+              lang={language}
+              pro={pro}
+              busy={busy === "listing"}
+              progress={progress}
+              languageCount={project.languages.length}
+              onGenerate={aiListing}
+              onChange={editListing}
+              onCopy={(text) => {
+                navigator.clipboard?.writeText(text).then(
+                  () => notify("Copied."),
+                  () => notify("Could not copy.", "err"),
+                );
+              }}
+            />
+          )}
         </main>
 
         {/* Right: style */}
@@ -661,10 +823,28 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
               })}
             </div>
           ))}
+          <Segmented<ExportLayout>
+            label="Folder layout"
+            value={project.exportLayout}
+            onChange={(exportLayout) => update((p) => ({ ...p, exportLayout }))}
+            options={[["simple", "Simple folders"], ["fastlane", "fastlane-ready"]]}
+          />
+          <p className="mb-3 mt-1 text-xs text-neutral-500">
+            {project.exportLayout === "fastlane"
+              ? "Matches fastlane deliver (iOS) and supply (Android): screenshots plus listing text, ready to upload with one command."
+              : "One folder per language and size. Listing text is included as listing.txt when written."}
+          </p>
           <p className="text-sm text-neutral-600">
-            {project.screens.length} screens × {project.exportSizes.length} sizes × {pro ? project.languages.length : 1} language
-            {(pro ? project.languages.length : 1) > 1 ? "s" : ""} ={" "}
-            <b>{project.screens.length * project.exportSizes.length * (pro ? project.languages.length : 1)} images</b>
+            {(() => {
+              const langs = pro ? project.languages.length : 1;
+              const perLang = project.exportSizes.map(sizeById).reduce((n, sz) => n + (sz.device === "feature-graphic" ? 1 : project.screens.length), 0);
+              return (
+                <>
+                  {langs} language{langs > 1 ? "s" : ""} × {perLang} images = <b>{langs * perLang} images</b>
+                  {pro && Object.keys(project.listings).length > 0 && <> + listing text for {Object.keys(project.listings).length} languages</>}
+                </>
+              );
+            })()}
           </p>
           {!pro && (
             <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
@@ -764,6 +944,7 @@ function UpgradeModal(props: { onClose: () => void; onActivate: (key: string) =>
         <li>✓ Up to 10 screenshots per project</li>
         <li>✓ AI translation into 40 languages</li>
         <li>✓ No watermark</li>
+        <li>✓ AI store listing text (subtitle, keywords, descriptions) in every language</li>
         <li>✓ Unlimited AI captions (fair use)</li>
       </ul>
       <div className="grid grid-cols-3 gap-2">
@@ -793,6 +974,87 @@ function UpgradeModal(props: { onClose: () => void; onActivate: (key: string) =>
           {props.busy ? "Checking…" : "Activate"}
         </button>
       </form>
+      <p className="mt-3 text-xs text-neutral-500">
+        Lost your key or want to cancel?{" "}
+        <a href={BILLING_PORTAL} target="_blank" rel="noopener" className="underline">Manage your purchase</a> or email{" "}
+        <a href={`mailto:${SITE.supportEmail}`} className="underline">{SITE.supportEmail}</a>.
+      </p>
     </Modal>
+  );
+}
+
+const LISTING_FIELDS: { key: keyof Listing; label: string; store: string; rows: number; hint: string }[] = [
+  { key: "subtitle", label: "Subtitle", store: "App Store", rows: 1, hint: "Shown under your app name." },
+  { key: "promotionalText", label: "Promotional text", store: "App Store", rows: 3, hint: "Can be changed anytime without a new release." },
+  { key: "keywords", label: "Keywords", store: "App Store", rows: 2, hint: "Comma-separated, no spaces. Hidden from users, used for search." },
+  { key: "playShortDescription", label: "Short description", store: "Google Play", rows: 2, hint: "Shown at the top of your Play listing." },
+  { key: "description", label: "Description", store: "Both stores", rows: 14, hint: "The full description." },
+];
+
+function ListingPanel(props: {
+  listing: Listing | undefined;
+  lang: Language;
+  pro: boolean;
+  busy: boolean;
+  progress: number | null;
+  languageCount: number;
+  onGenerate: () => void;
+  onChange: (patch: Partial<Listing>) => void;
+  onCopy: (text: string) => void;
+}) {
+  const l = props.listing ?? EMPTY_LISTING;
+  return (
+    <div className="max-w-3xl space-y-4">
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+        <p className="text-sm text-indigo-900">
+          AI writes your App Store and Google Play listing text for <b>{props.languageCount} language{props.languageCount > 1 ? "s" : ""}</b>, with
+          keywords people actually search for in each market. It is included in your export (and in fastlane format).
+        </p>
+        <button
+          onClick={props.onGenerate}
+          disabled={props.busy}
+          className="mt-3 rounded-lg bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {props.busy ? `Writing… ${Math.round((props.progress ?? 0) * 100)}%` : props.pro ? "✨ Write listing for all languages" : "🔒 Unlock with Pro"}
+        </button>
+      </div>
+      {LISTING_FIELDS.map((f) => {
+        const value = l[f.key];
+        const max = LISTING_LIMITS[f.key];
+        const over = value.length > max;
+        return (
+          <label key={f.key} className="block rounded-xl border border-neutral-200 bg-white p-3">
+            <span className="flex items-center justify-between text-sm">
+              <span>
+                <b>{f.label}</b> <span className="text-xs text-neutral-500">· {f.store}</span>
+              </span>
+              <span className="flex items-center gap-3">
+                <span className={`text-xs ${over ? "font-semibold text-red-600" : "text-neutral-500"}`}>
+                  {value.length}/{max}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    props.onCopy(value);
+                  }}
+                  className="text-xs font-semibold text-indigo-700"
+                >
+                  Copy
+                </button>
+              </span>
+            </span>
+            <textarea
+              value={value}
+              rows={f.rows}
+              dir={props.lang.rtl ? "rtl" : "ltr"}
+              onChange={(e) => props.onChange({ [f.key]: e.target.value } as Partial<Listing>)}
+              className={`mt-2 w-full rounded-md border px-2 py-1.5 text-sm ${over ? "border-red-400" : "border-neutral-300"}`}
+            />
+            <span className="text-xs text-neutral-500">{f.hint}</span>
+          </label>
+        );
+      })}
+    </div>
   );
 }

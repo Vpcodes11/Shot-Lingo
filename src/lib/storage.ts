@@ -17,6 +17,8 @@ export const newProject = (): Project => ({
   languages: ["en"],
   translations: {},
   exportSizes: SIZES.filter((s) => s.defaultOn).map((s) => s.id),
+  exportLayout: "simple",
+  listings: {},
 });
 
 export async function loadProject(): Promise<Project> {

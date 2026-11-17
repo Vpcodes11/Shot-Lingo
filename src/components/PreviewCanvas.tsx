@@ -17,6 +17,7 @@ interface Props {
   watermark: string | null;
   displayWidth: number;
   fontsReady: boolean;
+  appName?: string;
 }
 
 export default function PreviewCanvas(p: Props) {
@@ -45,8 +46,9 @@ export default function PreviewCanvas(p: Props) {
       lang: p.lang,
       fontFamily: p.fontFamily,
       watermark: p.watermark,
+      appName: p.appName,
     });
-  }, [p.image, p.imageWidth, p.imageHeight, p.caption, p.style, p.size, p.lang, p.fontFamily, p.watermark, p.displayWidth, displayHeight, p.fontsReady]);
+  }, [p.image, p.imageWidth, p.imageHeight, p.caption, p.style, p.size, p.lang, p.fontFamily, p.watermark, p.displayWidth, displayHeight, p.fontsReady, p.appName]);
 
   return (
     <canvas

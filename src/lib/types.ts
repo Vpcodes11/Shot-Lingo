@@ -28,6 +28,24 @@ export interface Screen {
   caption: Caption; // source language (English by default)
 }
 
+export interface Listing {
+  subtitle: string; // App Store, max 30
+  promotionalText: string; // App Store, max 170
+  keywords: string; // App Store, max 100, comma-separated
+  description: string; // both stores, max 4000
+  playShortDescription: string; // Google Play, max 80
+}
+
+export const LISTING_LIMITS: Record<keyof Listing, number> = {
+  subtitle: 30,
+  promotionalText: 170,
+  keywords: 100,
+  description: 4000,
+  playShortDescription: 80,
+};
+
+export type ExportLayout = "simple" | "fastlane";
+
 export interface Project {
   version: 1;
   appName: string;
@@ -39,4 +57,6 @@ export interface Project {
   // translations[lang][screenId] = Caption
   translations: Record<string, Record<string, Caption>>;
   exportSizes: string[];
+  exportLayout: ExportLayout;
+  listings: Record<string, Listing>;
 }

@@ -5,7 +5,7 @@ import { isProLicense, rateLimit } from "@/lib/server/license";
 import { langByCode } from "@/lib/languages";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const Caption = z.object({ headline: z.string().max(200), subheadline: z.string().max(300) });
 const Body = z.object({

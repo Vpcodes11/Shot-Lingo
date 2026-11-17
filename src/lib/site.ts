@@ -14,6 +14,9 @@ export const CHECKOUT = {
   lifetime: process.env.NEXT_PUBLIC_CHECKOUT_LIFETIME_URL || "",
 };
 
+// Where customers manage subscriptions / find their license key.
+export const BILLING_PORTAL = process.env.NEXT_PUBLIC_BILLING_PORTAL_URL || "https://app.lemonsqueezy.com/my-orders";
+
 export const PLANS = {
   free: { maxScreens: 3, maxLanguages: 1 },
   pro: { maxScreens: 10, maxLanguages: 40 },

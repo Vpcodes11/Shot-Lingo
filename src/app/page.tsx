@@ -11,19 +11,23 @@ const steps = [
 ];
 
 const features = [
-  { title: "Every required size", body: 'iPhone 6.9", 6.5", 6.3", 5.5", iPad 13", Android phone and tablets — rendered at the exact pixel sizes the stores accept.' },
+  { title: "Every required size", body: 'iPhone 6.9", 6.5", 6.3", 5.5", iPad 13", Android phones and tablets, plus the Google Play feature graphic, all at the exact pixel sizes the stores accept.' },
+  { title: "Store listing text, written for you", body: "Subtitle, keywords, promotional text and descriptions for both stores, in every language, within each store's character limits." },
+  { title: "fastlane-ready export", body: "One switch exports the exact folder structure fastlane deliver and supply expect. Upload screenshots and listing text with one command." },
   { title: "40 languages in one click", body: "Localized listings convert better. AI translates your captions like a native copywriter, not a dictionary." },
   { title: "Text that always fits", body: "Long German headline? Japanese with no spaces? Arabic right-to-left? The layout adapts automatically." },
   { title: "Device frames & templates", body: "Clean device frames, gradients, bleed and tilted layouts. Change the look once, every screenshot updates." },
-  { title: "Update in seconds", body: "Shipped a new UI? Swap the screenshot and re-export. Captions, styles and translations stay put." },
   { title: "Private by design", body: "Screenshots stay in your browser and are rendered on your device. Only small previews go to the AI when you ask." },
+  { title: "Update in seconds", body: "Shipped a new UI? Swap the screenshot and re-export. Captions, styles and translations stay put." },
 ];
 
 const faqs = [
   { q: "Do I need design skills?", a: "No. Pick a template, and the layout, sizes and text fitting are handled for you." },
   { q: "Which sizes do you export?", a: "All portrait sizes App Store Connect and Google Play Console accept for phones and tablets. See the full list on our screenshot sizes guide." },
   { q: "How good are the translations?", a: "They are written as marketing copy for each language and kept short enough to fit. You can edit every line before exporting." },
-  { q: "What does the free plan include?", a: "3 screenshots, 1 language, all sizes, 5 AI caption runs a day, and a small watermark." },
+  { q: "What does the free plan include?", a: "3 screenshots, 1 language, all sizes including the Play feature graphic, 5 AI caption runs a day, and a small watermark." },
+  { q: "Does it work with fastlane?", a: "Yes. Choose the fastlane-ready layout when exporting and drop the folder into your project. fastlane deliver and supply upload the screenshots and listing text for every language." },
+  { q: "Do I need an account?", a: "No. Your project is saved in your browser. Pro is unlocked with the license key you receive by email after purchase." },
   { q: "Can I cancel anytime?", a: "Yes. Monthly and yearly plans can be cancelled from the receipt email in one click." },
 ];
 
@@ -56,7 +60,7 @@ export default function Home() {
             App Store screenshots in every size and 40 languages.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-neutral-600">
-            Drop in raw screenshots. AI writes the captions, {SITE.name} adds device frames, and you download every size the App Store and Google Play need. It takes about 10 minutes, not a weekend.
+            Drop in raw screenshots. AI writes the captions and your store listing, {SITE.name} adds device frames, and you download every size the App Store and Google Play need, ready for fastlane. It takes about 10 minutes, not a weekend.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/app" className="rounded-xl bg-neutral-900 px-6 py-3 font-semibold text-white hover:bg-neutral-700">
@@ -121,7 +125,7 @@ export default function Home() {
             name="Free"
             price="$0"
             period=""
-            features={["3 screenshots", "All store sizes", "1 language", "5 AI caption runs / day", "Small watermark"]}
+            features={["3 screenshots", "All store sizes + feature graphic", "1 language", "5 AI caption runs / day", "Small watermark"]}
             cta="Start free"
             href="/app"
           />
@@ -131,7 +135,7 @@ export default function Home() {
             period="/month"
             highlight
             note="or $79/year — save 45%"
-            features={["10 screenshots per project", "All store sizes", "40 languages with AI translation", "Unlimited AI captions (fair use)", "No watermark"]}
+            features={["10 screenshots per project", "40 languages with AI translation", "AI store listing text + keywords", "fastlane-ready export", "Unlimited AI captions (fair use)", "No watermark"]}
             cta="Get Pro"
             href={buy(CHECKOUT.monthly)}
             secondary={{ label: "Get yearly — $79", href: buy(CHECKOUT.yearly) }}
