@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Storeshot
 
-## Getting Started
+App Store & Google Play screenshot generator: upload raw screenshots → AI captions → templates & device frames → every store size in up to 40 languages → one ZIP.
 
-First, run the development server:
+- **Landing page** `/` · **Editor** `/app` · **SEO size guide** `/app-store-screenshot-sizes` · `/privacy` · `/terms`
+- Rendering and export happen **in the browser** (canvas + JSZip), so hosting costs stay near zero.
+- Projects auto-save to the browser (IndexedDB). No accounts, no database.
+- AI (captions from screenshots, translation) runs through `/api/captions` and `/api/translate` using the Anthropic API.
+- Payments: any checkout link (built for **Lemon Squeezy** license keys). Pro is unlocked by pasting the license key; the server validates it with Lemon Squeezy.
+
+## Plans (edit in `src/lib/site.ts` and `src/app/page.tsx`)
+
+| | Free | Pro ($12/mo, $79/yr, $49 lifetime) |
+|---|---|---|
+| Screenshots | 3 | 10 |
+| Languages | 1 | 40 + AI translation |
+| AI captions | 5 runs/day per IP | fair use (300/day) |
+| Watermark | yes | no |
+
+## Run locally
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in ANTHROPIC_API_KEY at least
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Deploy to Vercel (≈10 minutes)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Push this folder to a GitHub repo.
+2. vercel.com → **Add New Project** → import the repo (framework auto-detected: Next.js).
+3. Add the environment variables from `.env.example` (at minimum `ANTHROPIC_API_KEY` and `NEXT_PUBLIC_SITE_URL`).
+4. Deploy. Add your custom domain under **Settings → Domains**, then update `NEXT_PUBLIC_SITE_URL` and redeploy.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Set up payments (Lemon Squeezy)
 
-## Learn More
+1. Create a store at lemonsqueezy.com (it is merchant of record: handles VAT/sales tax worldwide, pays out to Indian bank accounts).
+2. Create one product with three variants or three products: **Pro Monthly $12** (subscription), **Pro Yearly $79** (subscription), **Lifetime $49** (single payment).
+3. On each, enable **License keys** (unlimited activations, no expiry for lifetime; subscriptions disable the key automatically when cancelled).
+4. Copy each product's checkout URL into `NEXT_PUBLIC_CHECKOUT_*_URL`, and your store ID into `LEMONSQUEEZY_STORE_ID`.
+5. Customers receive the key by email and paste it into **Upgrade → Activate** in the editor.
 
-To learn more about Next.js, take a look at the following resources:
+For testing without buying, put a made-up key in `PRO_LICENSE_KEYS` and activate it in the editor.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## AI costs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Default model is `claude-opus-5-5` with low effort. A caption run (up to 10 screenshot thumbnails) and a 6-language translation batch are each a single request. To cut costs, set `AI_MODEL=claude-haiku-5-5`. Free-tier abuse is limited by an in-memory per-IP limit; for heavy traffic swap `rateLimit` in `src/lib/server/license.ts` for Upstash Redis.
 
-## Deploy on Vercel
+## Known MVP limits
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- The watermark and screen limits are enforced in the browser; a technical user could bypass them. AI features (the costly part) are enforced on the server.
+- Projects live in one browser. Cloud sync/accounts are a v2 item.
+- Store size requirements change: re-check `src/lib/sizes.ts` against Apple/Google docs periodically.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Roadmap ideas
+
+Direct upload to App Store Connect / Google Play, video previews, Play feature graphic (1024×500), more fonts & templates, team workspaces.

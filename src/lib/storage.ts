@@ -1,0 +1,69 @@
+"use client";
+import { get, set, del } from "idb-keyval";
+import type { Project } from "./types";
+import { defaultStyle } from "./templates";
+import { SIZES } from "./sizes";
+
+const PROJECT_KEY = "storeshot:project:v1";
+const LICENSE_KEY = "storeshot:license";
+
+export const newProject = (): Project => ({
+  version: 1,
+  appName: "",
+  appDescription: "",
+  sourceLang: "en",
+  screens: [],
+  style: defaultStyle(),
+  languages: ["en"],
+  translations: {},
+  exportSizes: SIZES.filter((s) => s.defaultOn).map((s) => s.id),
+});
+
+export async function loadProject(): Promise<Project> {
+  try {
+    const p = (await get(PROJECT_KEY)) as Project | undefined;
+    if (p && p.version === 1) return { ...newProject(), ...p, style: { ...defaultStyle(), ...p.style } };
+  } catch {}
+  return newProject();
+}
+
+export async function saveProject(p: Project) {
+  try {
+    await set(PROJECT_KEY, p);
+  } catch {}
+}
+
+export async function saveImage(key: string, dataUrl: string) {
+  try {
+    await set(`storeshot:img:${key}`, dataUrl);
+  } catch {}
+}
+
+export async function loadImage(key: string): Promise<string | undefined> {
+  try {
+    return (await get(`storeshot:img:${key}`)) as string | undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function deleteImage(key: string) {
+  try {
+    await del(`storeshot:img:${key}`);
+  } catch {}
+}
+
+export function getLicense(): string {
+  try {
+    return localStorage.getItem(LICENSE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function setLicense(key: string) {
+  try {
+    if (key) localStorage.setItem(LICENSE_KEY, key);
+    else localStorage.removeItem(LICENSE_KEY);
+  } catch {}
+}
