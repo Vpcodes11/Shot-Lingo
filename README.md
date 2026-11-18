@@ -10,7 +10,7 @@ Upload raw screenshots → AI writes captions → pick a template → AI transla
 |---|---|
 | App + API | Next.js 15 (App Router) on Vercel |
 | Rendering & export | In the browser (canvas + JSZip): near-zero hosting cost |
-| Accounts | Supabase Auth: email magic link (+ optional Google) |
+| Accounts | Supabase Auth: Google sign-in + email magic link |
 | Database | Supabase Postgres: `subscriptions`, `usage_counters`, `webhook_events`, with row level security |
 | Payments | Lemon Squeezy (merchant of record: global tax, pays out to India), synced by signed webhooks |
 | AI | Anthropic API (captions from screenshots, translation, listing text) |
@@ -40,7 +40,12 @@ AI limits are enforced on the server (database counters). Prices: `src/app/page.
 3. **Authentication → URL Configuration**: Site URL = `https://YOUR-DOMAIN`; add redirect URL `https://YOUR-DOMAIN/**` (and your `*.vercel.app` URL while testing).
 4. **Authentication → Emails → Templates → Magic Link** and **Confirm signup**: subject `Your ShotLingo sign-in link`, body from `supabase/templates/magic_link.html`.
 5. **Authentication → Emails → SMTP**: connect a sender (e.g. Resend, free tier). Supabase's built-in email is rate-limited and only for testing.
-6. Optional Google login: **Authentication → Providers → Google** (needs a Google OAuth client), then set `NEXT_PUBLIC_GOOGLE_AUTH=1`.
+6. **Google sign-in** (shown on the login page by default; until it's set up, the button tells users to use email):
+   1. Google Cloud Console → **APIs & Services → OAuth consent screen**: app name “ShotLingo”, your support email, your domain; add scopes `email`, `profile`, `openid`; then **Publish app** (otherwise only test users can sign in).
+   2. **Credentials → Create credentials → OAuth client ID → Web application**.
+      - Authorized JavaScript origins: `https://YOUR-DOMAIN`
+      - Authorized redirect URI: `https://<your-project-ref>.supabase.co/auth/v1/callback` (shown in Supabase under Authentication → Providers → Google)
+   3. Supabase → **Authentication → Providers → Google** → enable, paste the Client ID and Client secret, save.
 7. **Project Settings → API**: copy the URL, anon key and service role key.
 
 ### 2. Lemon Squeezy (payments)

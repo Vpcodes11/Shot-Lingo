@@ -28,8 +28,11 @@ export default async function Login({ searchParams }: { searchParams: Promise<Re
         {sp.error === "link" && (
           <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">That sign-in link expired or was already used. Request a new one.</p>
         )}
+        {sp.error === "oauth" && (
+          <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">Google sign-in was cancelled or failed. Try again, or use your email.</p>
+        )}
         <div className="mt-5">
-          <LoginForm next={next} googleEnabled={process.env.NEXT_PUBLIC_GOOGLE_AUTH === "1"} />
+          <LoginForm next={next} />
         </div>
       </div>
     </div>
