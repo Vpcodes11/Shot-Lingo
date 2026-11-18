@@ -2,7 +2,7 @@ import Link from "next/link";
 import HeroShowcase from "@/components/HeroShowcase";
 import SiteFooter from "@/components/SiteFooter";
 import { inter } from "@/lib/fonts";
-import { CHECKOUT, SITE } from "@/lib/site";
+import { SITE } from "@/lib/site";
 
 const steps = [
   { n: "1", title: "Drop your raw screenshots", body: "Straight from the simulator or your phone. Up to 10 per app." },
@@ -22,17 +22,21 @@ const features = [
 ];
 
 const faqs = [
+  {
+    q: "Can't I just use ChatGPT for this?",
+    a: "ChatGPT can write and translate your captions, and you can paste them in here. What it can't do is produce the images: 5 screens × 5 sizes × 10 languages is about 250 PNGs, each with text that fits, the right device frame and exact pixel size, plus feature graphics and fastlane folders. That production work is what ShotLingo automates, and it redoes all of it in two minutes when your UI changes.",
+  },
   { q: "Do I need design skills?", a: "No. Pick a template, and the layout, sizes and text fitting are handled for you." },
   { q: "Which sizes do you export?", a: "All portrait sizes App Store Connect and Google Play Console accept for phones and tablets. See the full list on our screenshot sizes guide." },
   { q: "How good are the translations?", a: "They are written as marketing copy for each language and kept short enough to fit. You can edit every line before exporting." },
   { q: "What does the free plan include?", a: "3 screenshots, 1 language, all sizes including the Play feature graphic, 5 AI caption runs a day, and a small watermark." },
   { q: "Does it work with fastlane?", a: "Yes. Choose the fastlane-ready layout when exporting and drop the folder into your project. fastlane deliver and supply upload the screenshots and listing text for every language." },
-  { q: "Do I need an account?", a: "No. Your project is saved in your browser. Pro is unlocked with the license key you receive by email after purchase." },
+  { q: "Do I need an account?", a: "Not to try it. Your project is saved in your browser. To upgrade, you sign in with a one-click email link, so Pro works on every device you use." },
   { q: "Can I cancel anytime?", a: "Yes. Monthly and yearly plans can be cancelled from the receipt email in one click." },
 ];
 
 export default function Home() {
-  const buy = (url: string) => url || "/app";
+  const buy = (plan: "monthly" | "yearly" | "lifetime") => `/api/checkout?plan=${plan}`;
   return (
     <div className="min-h-screen bg-white">
       <nav className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-4">
@@ -45,7 +49,10 @@ export default function Home() {
           <a href="#pricing" className="hover:text-neutral-900">Pricing</a>
           <Link href="/app-store-screenshot-sizes" className="hover:text-neutral-900">Size guide</Link>
         </div>
-        <Link href="/app" className="ml-auto rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
+        <Link href="/account" className="ml-auto text-sm text-neutral-600 hover:text-neutral-900">
+          Sign in
+        </Link>
+        <Link href="/app" className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-700">
           Open editor
         </Link>
       </nav>
@@ -57,10 +64,10 @@ export default function Home() {
             For indie developers, app studios and agencies
           </p>
           <h1 className="mx-auto max-w-3xl text-4xl font-extrabold tracking-tight sm:text-6xl">
-            App Store screenshots in every size and 40 languages.
+            Every store screenshot. Every size. Every language. One export.
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-neutral-600">
-            Drop in raw screenshots. AI writes the captions and your store listing, {SITE.name} adds device frames, and you download every size the App Store and Google Play need, ready for fastlane. It takes about 10 minutes, not a weekend.
+            Drop in your raw screenshots. Get back hundreds of finished, store-ready images: device frames, captions that fit in 40 languages, every App Store and Google Play size, the feature graphic and your listing text. Ready for fastlane. About 10 minutes, not a weekend in Figma.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link href="/app" className="rounded-xl bg-neutral-900 px-6 py-3 font-semibold text-white hover:bg-neutral-700">
@@ -137,8 +144,8 @@ export default function Home() {
             note="or $79/year — save 45%"
             features={["10 screenshots per project", "40 languages with AI translation", "AI store listing text + keywords", "fastlane-ready export", "Unlimited AI captions (fair use)", "No watermark"]}
             cta="Get Pro"
-            href={buy(CHECKOUT.monthly)}
-            secondary={{ label: "Get yearly — $79", href: buy(CHECKOUT.yearly) }}
+            href={buy("monthly")}
+            secondary={{ label: "Get yearly — $79", href: buy("yearly") }}
           />
           <Plan
             name="Lifetime"
@@ -147,7 +154,7 @@ export default function Home() {
             note="Launch deal for early users"
             features={["Everything in Pro", "Pay once, use forever", "All future templates"]}
             cta="Get lifetime"
-            href={buy(CHECKOUT.lifetime)}
+            href={buy("lifetime")}
           />
         </div>
       </section>

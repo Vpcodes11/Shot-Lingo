@@ -5,7 +5,6 @@ import { defaultStyle } from "./templates";
 import { SIZES } from "./sizes";
 
 const PROJECT_KEY = "shotlingo:project:v1";
-const LICENSE_KEY = "shotlingo:license";
 
 export const newProject = (): Project => ({
   version: 1,
@@ -52,20 +51,5 @@ export async function loadImage(key: string): Promise<string | undefined> {
 export async function deleteImage(key: string) {
   try {
     await del(`shotlingo:img:${key}`);
-  } catch {}
-}
-
-export function getLicense(): string {
-  try {
-    return localStorage.getItem(LICENSE_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-
-export function setLicense(key: string) {
-  try {
-    if (key) localStorage.setItem(LICENSE_KEY, key);
-    else localStorage.removeItem(LICENSE_KEY);
   } catch {}
 }

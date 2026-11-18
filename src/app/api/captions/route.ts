@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import * as z from "zod/v4";
 import { AiError, writeCaptions } from "@/lib/server/ai";
-import { clientIp, isProLicense, rateLimit } from "@/lib/server/license";
+import { allowDaily, clientIp } from "@/lib/server/limits";
+import { getViewer } from "@/lib/server/billing";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -15,15 +16,18 @@ const Body = z.object({
     .max(10),
 });
 
-const DAY = 24 * 60 * 60 * 1000;
 
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
-  const key = req.headers.get("x-license-key");
-  const pro = await isProLicense(key);
-  const allowed = pro ? rateLimit(`cap:key:${key}`, 300, DAY) : rateLimit(`cap:ip:${clientIp(req)}`, 5, DAY);
+  const viewer = await getViewer();
+  const pro = viewer.pro;
+  const allowed = pro
+    ? await allowDaily(`cap:user:${viewer.user!.id}`, 300)
+    : viewer.user
+      ? (await allowDaily(`cap:user:${viewer.user.id}`, 5)) && (await allowDaily(`cap:ip:${clientIp(req)}`, 15))
+      : await allowDaily(`cap:ip:${clientIp(req)}`, 5);
   if (!allowed) {
     return NextResponse.json(
       { error: pro ? "Daily AI limit reached. Try again tomorrow." : "Free AI captions used up for today. Upgrade to Pro for unlimited." },

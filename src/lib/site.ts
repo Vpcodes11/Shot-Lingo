@@ -6,15 +6,7 @@ export const SITE = {
   supportEmail: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@example.com",
 };
 
-// Checkout links (Lemon Squeezy, Stripe Payment Links, Gumroad... any URL works).
-// Leave empty while testing: buttons fall back to the editor.
-export const CHECKOUT = {
-  monthly: process.env.NEXT_PUBLIC_CHECKOUT_MONTHLY_URL || "",
-  yearly: process.env.NEXT_PUBLIC_CHECKOUT_YEARLY_URL || "",
-  lifetime: process.env.NEXT_PUBLIC_CHECKOUT_LIFETIME_URL || "",
-};
-
-// Where customers manage subscriptions / find their license key.
+// Fallback link where customers manage their purchase (used when no portal URL is stored).
 export const BILLING_PORTAL = process.env.NEXT_PUBLIC_BILLING_PORTAL_URL || "https://app.lemonsqueezy.com/my-orders";
 
 export const PLANS = {

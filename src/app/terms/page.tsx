@@ -13,7 +13,7 @@ export default function Terms() {
       <h2>Your content</h2>
       <p>Only upload content you have the right to use. Do not use the service for unlawful, misleading or infringing material. Check AI-written captions and translations before publishing them; you are responsible for what you publish.</p>
       <h2>Plans and payments</h2>
-      <p>Paid plans are sold through our payment provider, which acts as merchant of record. Subscriptions renew until cancelled and can be cancelled at any time; access continues until the end of the paid period. Lifetime licenses give access to Pro features for as long as the service operates. Fair-use limits apply to AI features.</p>
+      <p>Paid plans are linked to your account and sold through our payment provider, Lemon Squeezy, which acts as merchant of record. Subscriptions renew until cancelled and can be cancelled at any time from your account page; access continues until the end of the paid period. Lifetime plans give access to Pro features for as long as the service operates. Fair-use limits apply to AI features.</p>
       <h2>Refunds</h2>
       <p>If {SITE.name} doesn&apos;t work for you, email {SITE.supportEmail} within 14 days of purchase for a refund.</p>
       <h2>Liability</h2>

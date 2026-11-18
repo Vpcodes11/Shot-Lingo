@@ -7,13 +7,13 @@ import { renderScreenshot } from "@/lib/render";
 import { SIZES, sizeById } from "@/lib/sizes";
 import { LANGUAGES, langByCode } from "@/lib/languages";
 import { TEMPLATES } from "@/lib/templates";
-import { BILLING_PORTAL, CHECKOUT, PLANS, SITE } from "@/lib/site";
+import { PLANS, SITE } from "@/lib/site";
 import type { Caption, ExportLayout, Layout, FrameStyle, Listing, Project, Screen, Style } from "@/lib/types";
 import { LISTING_LIMITS } from "@/lib/types";
 import { DEMO_PROJECT, DEMO_SIZE, demoScreen } from "@/lib/demo";
 import type { Language } from "@/lib/languages";
 import {
-  deleteImage, getLicense, loadImage, loadProject, newProject, saveImage, saveProject, setLicense,
+  deleteImage, loadImage, loadProject, newProject, saveImage, saveProject,
 } from "@/lib/storage";
 
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -72,10 +72,10 @@ function listingText(appName: string, lang: Language, l: Listing): string {
   ].join("\n");
 }
 
-async function api<T>(path: string, body: unknown, license: string): Promise<T> {
+async function api<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-license-key": license },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -86,7 +86,7 @@ async function api<T>(path: string, body: unknown, license: string): Promise<T> 
 export default function Editor({ fontFamily }: { fontFamily: string }) {
   const [project, setProject] = useState<Project | null>(null);
   const [images, setImages] = useState<Record<string, HTMLImageElement>>({});
-  const [license, setLicenseState] = useState("");
+  const [me, setMe] = useState<{ email: string } | null>(null);
   const [pro, setPro] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
   const [sizeId, setSizeId] = useState(SIZES[0].id);
@@ -98,6 +98,15 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
   const [dragOver, setDragOver] = useState(false);
   const [view, setView] = useState<"screens" | "listing">("screens");
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const refreshMe = useCallback(async () => {
+    try {
+      const res = await fetch("/api/me", { cache: "no-store" });
+      const data = (await res.json()) as { user: { email: string } | null; pro: boolean };
+      setMe(data.user);
+      setPro(data.pro);
+    } catch {}
+  }, []);
 
   const notify = useCallback((msg: string, kind: "ok" | "err" = "ok") => {
     setToast({ msg, kind });
@@ -117,19 +126,13 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
       setProject(p);
       setLang(p.sourceLang);
       if (new URLSearchParams(window.location.search).get("upgrade")) setModal("upgrade");
-      const key = getLicense();
-      setLicenseState(key);
-      if (key) {
-        api<{ pro: boolean }>("/api/license", { licenseKey: key }, key)
-          .then((r) => setPro(r.pro))
-          .catch(() => {});
-      }
+      refreshMe();
     })();
     const fam = fontFamily;
     Promise.all([document.fonts.load(`800 40px ${fam}`), document.fonts.load(`500 40px ${fam}`)])
       .catch(() => {})
       .finally(() => setFontsReady(true));
-  }, [fontFamily]);
+  }, [fontFamily, refreshMe]);
 
   // Autosave
   useEffect(() => {
@@ -248,7 +251,6 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
         const r = await api<{ listings: { lang: string; listing: Listing }[] }>(
           "/api/listing",
           { appName: project.appName, appDescription: project.appDescription, captions, langs: batch },
-          license,
         );
         update((p) => {
           const listings = { ...p.listings };
@@ -275,7 +277,7 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
         image: images[s.imageKey] ? thumbForAi(images[s.imageKey]) : undefined,
         notes: s.caption.headline || undefined,
       }));
-      const r = await api<{ captions: Caption[] }>("/api/captions", { appName: project.appName, appDescription: project.appDescription, screens }, license);
+      const r = await api<{ captions: Caption[] }>("/api/captions", { appName: project.appName, appDescription: project.appDescription, screens });
       update((p) => ({
         ...p,
         screens: p.screens.map((s, i) => (r.captions[i] ? { ...s, caption: { headline: r.captions[i].headline, subheadline: r.captions[i].subheadline } } : s)),
@@ -307,7 +309,6 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
         const r = await api<{ translations: { lang: string; captions: Caption[] }[] }>(
           "/api/translate",
           { appName: project.appName, sourceLang: project.sourceLang, targetLangs: batch, captions },
-          license,
         );
         update((p) => {
           const translations = { ...p.translations };
@@ -432,24 +433,6 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
     }
   }
 
-  async function activateLicense(key: string) {
-    setBusy("license");
-    try {
-      const r = await api<{ pro: boolean }>("/api/license", { licenseKey: key.trim() }, key.trim());
-      if (r.pro) {
-        setLicense(key.trim());
-        setLicenseState(key.trim());
-        setPro(true);
-        setModal(null);
-        notify("Pro unlocked. Thank you!");
-      } else notify("That license key is not valid.", "err");
-    } catch (e) {
-      notify((e as Error).message, "err");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   function resetProject() {
     if (!project) return;
     if (!window.confirm("Start a new project? This removes the current screenshots and captions.")) return;
@@ -481,6 +464,13 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
         </span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={resetProject} className="rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100">New</button>
+          {me ? (
+            <Link href="/account" className="hidden max-w-[180px] truncate rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100 sm:block" title={me.email}>
+              {me.email}
+            </Link>
+          ) : (
+            <Link href="/login?next=/app" className="rounded-lg px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100">Sign in</Link>
+          )}
           {!pro && (
             <button onClick={() => setModal("upgrade")} className="rounded-lg px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50">
               Upgrade
@@ -766,7 +756,7 @@ export default function Editor({ fontFamily }: { fontFamily: string }) {
       </div>
 
       {/* Modals */}
-      {modal === "upgrade" && <UpgradeModal onClose={() => setModal(null)} onActivate={activateLicense} busy={busy === "license"} />}
+      {modal === "upgrade" && <UpgradeModal onClose={() => setModal(null)} signedIn={!!me} />}
       {modal === "languages" && (
         <Modal title="Languages" onClose={() => setModal(null)}>
           <p className="mb-3 text-sm text-neutral-600">Pick the store languages you want. Then hit “Translate captions with AI”.</p>
@@ -935,49 +925,36 @@ function Modal(props: { title: string; onClose: () => void; children: React.Reac
   );
 }
 
-function UpgradeModal(props: { onClose: () => void; onActivate: (key: string) => void; busy: boolean }) {
-  const [key, setKey] = useState("");
-  const link = (url: string) => url || "/#pricing";
+function UpgradeModal(props: { onClose: () => void; signedIn: boolean }) {
+  const plan = (id: string) => `/api/checkout?plan=${id}`;
   return (
     <Modal title={`Upgrade to ${SITE.name} Pro`} onClose={props.onClose}>
       <ul className="mb-4 space-y-1 text-sm text-neutral-700">
         <li>✓ Up to 10 screenshots per project</li>
         <li>✓ AI translation into 40 languages</li>
-        <li>✓ No watermark</li>
         <li>✓ AI store listing text (subtitle, keywords, descriptions) in every language</li>
+        <li>✓ fastlane-ready export, no watermark</li>
         <li>✓ Unlimited AI captions (fair use)</li>
       </ul>
       <div className="grid grid-cols-3 gap-2">
-        <a href={link(CHECKOUT.monthly)} target="_blank" rel="noopener" className="rounded-xl border border-neutral-300 p-3 text-center hover:border-indigo-600">
+        <a href={plan("monthly")} className="rounded-xl border border-neutral-300 p-3 text-center hover:border-indigo-600">
           <div className="text-lg font-bold">$12</div>
           <div className="text-xs text-neutral-500">per month</div>
         </a>
-        <a href={link(CHECKOUT.yearly)} target="_blank" rel="noopener" className="rounded-xl border-2 border-indigo-600 p-3 text-center">
+        <a href={plan("yearly")} className="rounded-xl border-2 border-indigo-600 p-3 text-center">
           <div className="text-lg font-bold">$79</div>
-          <div className="text-xs text-neutral-500">per year</div>
+          <div className="text-xs text-neutral-500">per year · save 45%</div>
         </a>
-        <a href={link(CHECKOUT.lifetime)} target="_blank" rel="noopener" className="rounded-xl border border-neutral-300 p-3 text-center hover:border-indigo-600">
+        <a href={plan("lifetime")} className="rounded-xl border border-neutral-300 p-3 text-center hover:border-indigo-600">
           <div className="text-lg font-bold">$49</div>
           <div className="text-xs text-neutral-500">lifetime (launch)</div>
         </a>
       </div>
-      <p className="mt-4 text-sm text-neutral-600">After purchase you get a license key by email. Paste it here:</p>
-      <form
-        className="mt-2 flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (key.trim()) props.onActivate(key);
-        }}
-      >
-        <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="License key" className="min-w-0 flex-1 rounded-lg border border-neutral-300 px-3 py-2 text-sm" />
-        <button disabled={props.busy} className="rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-          {props.busy ? "Checking…" : "Activate"}
-        </button>
-      </form>
-      <p className="mt-3 text-xs text-neutral-500">
-        Lost your key or want to cancel?{" "}
-        <a href={BILLING_PORTAL} target="_blank" rel="noopener" className="underline">Manage your purchase</a> or email{" "}
-        <a href={`mailto:${SITE.supportEmail}`} className="underline">{SITE.supportEmail}</a>.
+      <p className="mt-4 text-xs text-neutral-500">
+        {props.signedIn
+          ? "Secure checkout by Lemon Squeezy. Pro unlocks on your account right after payment. Cancel anytime."
+          : "You'll sign in with your email first, so Pro is linked to your account on every device. Secure checkout by Lemon Squeezy."}{" "}
+        Your current project stays saved in this browser.
       </p>
     </Modal>
   );

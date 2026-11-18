@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.0",
     "@vercel/analytics": "^2.0.1",
     "idb-keyval": "^6.3.0",
     "jszip": "^3.10.2",
@@ -27,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.29",
+    "supabase": "^3.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

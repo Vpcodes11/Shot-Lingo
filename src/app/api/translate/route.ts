@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import * as z from "zod/v4";
 import { AiError, translateCaptions } from "@/lib/server/ai";
-import { isProLicense, rateLimit } from "@/lib/server/license";
+import { allowDaily } from "@/lib/server/limits";
+import { getViewer } from "@/lib/server/billing";
 import { langByCode } from "@/lib/languages";
 
 export const runtime = "nodejs";
@@ -19,11 +20,11 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
 
-  const key = req.headers.get("x-license-key");
-  if (!(await isProLicense(key))) {
+  const viewer = await getViewer();
+  if (!viewer.pro) {
     return NextResponse.json({ error: "AI translation is a Pro feature." }, { status: 402 });
   }
-  if (!rateLimit(`tr:key:${key}`, 200, 24 * 60 * 60 * 1000)) {
+  if (!(await allowDaily(`tr:user:${viewer.user!.id}`, 200))) {
     return NextResponse.json({ error: "Daily translation limit reached. Try again tomorrow." }, { status: 429 });
   }
 
