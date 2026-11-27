@@ -61,6 +61,8 @@ AI limits are enforced on the server (database counters). Prices: `src/app/page.
 2. Add every variable from `.env.example` (Supabase, Anthropic, Lemon Squeezy, site URL, support email). Set `AI_MODEL=claude-haiku-5-5` to keep AI costs low.
 3. Deploy, then add your domain under **Settings → Domains** and update `NEXT_PUBLIC_SITE_URL` and the Supabase URL settings.
 
+Then open `https://YOUR-DOMAIN/api/health?key=YOUR_HEALTH_KEY`: it lists every setting as present or missing (never the values).
+
 ### 4. Test with real money off
 1. In Lemon Squeezy, switch to **Test mode** (test products and webhook). Buy with card `4242 4242 4242 4242`.
 2. Check: `/thanks` says Pro is active → `/account` shows the plan → translation works → “Manage billing” opens the portal → cancel there → account shows “Pro until …”.
